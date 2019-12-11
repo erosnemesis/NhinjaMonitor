@@ -1,0 +1,30 @@
+{
+    "extensions.ignoreRecommendations": true,
+    "C_Cpp.default.configurationProvider": "particle.particle-vscode-core",
+    "cortex-debug.openocdPath": "${command:particle.getDebuggerOpenocdPath}",
+    "files.associations": {
+        "*.ino": "cpp",
+        "cassert": "cpp",
+        "cctype": "cpp",
+        "cerrno": "cpp",
+        "cfloat": "cpp",
+        "climits": "cpp",
+        "clocale": "cpp",
+        "cmath": "cpp",
+        "cstdarg": "cpp",
+        "cstddef": "cpp",
+        "cstdio": "cpp",
+        "cstdlib": "cpp",
+        "cstring": "cpp",
+        "ctime": "cpp",
+        "cwchar": "cpp",
+        "cwctype": "cpp",
+        "functional": "cpp",
+        "iosfwd": "cpp",
+        "streambuf": "cpp",
+        "typeinfo": "cpp"
+    },
+    "particle.targetPlatform": "electron",
+    "particle.targetDevice": "220039000147373336373936",
+    "particle.firmwareVersion": "1.4.2"
+}
