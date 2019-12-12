@@ -15,7 +15,7 @@ void updateAmpVariables();
 #line 3 "c:/Users/erosn/ownCloud/ParticleProjects/Monitoring_E/src/Monitoring_E.ino"
 PRODUCT_ID(10352);
 
-PRODUCT_VERSION(13);
+PRODUCT_VERSION(16);
 
 /*
  * Project Nhinja Monitoring
@@ -29,7 +29,6 @@ PRODUCT_VERSION(13);
 #include "RemoteAlarmReset.h"
 
 #define PUBLISH_NAME_ALARM "Dryer_Alarms" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
-#define PUBLISH_NAME_AMP "Amp_Values" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
 #define PUBLISH_NAME_MSG "Messages" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
 
 struct MonitorSettings{
@@ -85,6 +84,7 @@ void setup() {
   for(int i = 0; i < settings.clamps; i++){
     Particle.variable(String("Amp_" + String(i)), &AMP_READING[i], DOUBLE);
   }
+  Particle.variable("Amp_Calibration", &settings.calibration, DOUBLE);
 
   // Timer for Amp Clamp ADC updates
   timer.start();
@@ -115,10 +115,9 @@ void loop() {
 void processAlarm(int alarmNum, bool alarmState){
   
   if(alarmState){
-    String alarmStr = String("Dryer ") + String(alarmNum+1) + String(" in Alarm");
-
     // Only publish the in alarm state if the previous state was not in alarm
     if(!alarmDetector.getPreviousAlarmState(alarmNum)){
+      String alarmStr = String("Dryer ") + String(alarmNum+1) + String(" in Alarm");
       Particle.publish(PUBLISH_NAME_ALARM, alarmStr, PRIVATE);
     }
     alarmDetector.setPreviousAlarmState(alarmNum, true);
@@ -183,7 +182,6 @@ int setRelayCount(String count){
   }
 
   settings.relays = rCount;
-
   EEPROM.put(0, settings);
 
   Particle.publish(PUBLISH_NAME_MSG, String("Relay Count has been updated to " + String(rCount)), PRIVATE);
@@ -243,6 +241,4 @@ void updateAmpVariables(){
     double iRMS = monitor.getIrms(i, settings.calibration);
     AMP_READING[i] = iRMS;
   }
-
-  // add publish event here
 }

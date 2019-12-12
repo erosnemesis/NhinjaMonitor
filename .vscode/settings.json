@@ -26,5 +26,5 @@
     },
     "particle.targetPlatform": "electron",
     "particle.targetDevice": "220039000147373336373936",
-    "particle.firmwareVersion": "1.4.2"
+    "particle.firmwareVersion": "1.4.4"
 }

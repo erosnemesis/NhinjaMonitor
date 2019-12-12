@@ -24,19 +24,19 @@ const uint8_t AlarmDetector::getAlarmState(uint8_t alarm){
 
 void AlarmDetector::alarm0()
 {
-    alarmState[0] = digitalRead(hardwareAlarmPin[0]);
+    alarmState[0] = !digitalRead(hardwareAlarmPin[0]);
 }
 void AlarmDetector::alarm1()
 {
-    alarmState[1] = digitalRead(hardwareAlarmPin[1]);
+    alarmState[1] = !digitalRead(hardwareAlarmPin[1]);
 }
 void AlarmDetector::alarm2()
 {
-    alarmState[2] = digitalRead(hardwareAlarmPin[2]);
+    alarmState[2] = !digitalRead(hardwareAlarmPin[2]);
 }
 void AlarmDetector::alarm3()
 {
-    alarmState[3] = digitalRead(hardwareAlarmPin[3]);
+    alarmState[3] = !digitalRead(hardwareAlarmPin[3]);
 }
 
 const uint8_t AlarmDetector::getDefaultAlarmCount()
