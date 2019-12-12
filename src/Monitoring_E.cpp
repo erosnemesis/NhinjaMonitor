@@ -15,7 +15,7 @@ void updateAmpVariables();
 #line 3 "c:/Users/erosn/ownCloud/ParticleProjects/Monitoring_E/src/Monitoring_E.ino"
 PRODUCT_ID(10352);
 
-PRODUCT_VERSION(12);
+PRODUCT_VERSION(13);
 
 /*
  * Project Nhinja Monitoring
@@ -25,9 +25,12 @@ PRODUCT_VERSION(12);
  */
 
 #include "CurrentMonitor.h"
+#include "AlarmDetector.h"
+#include "RemoteAlarmReset.h"
 
-#define MONITOR_DEBUG false
-#define PUBLISH_NAME "Dryer_Alarms" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDS ON THIS
+#define PUBLISH_NAME_ALARM "Dryer_Alarms" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
+#define PUBLISH_NAME_AMP "Amp_Values" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
+#define PUBLISH_NAME_MSG "Messages" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
 
 struct MonitorSettings{
   uint8_t version;
@@ -35,46 +38,35 @@ struct MonitorSettings{
   double calibration;
 } settings;
 
-const uint8_t relayCount = 4;
-const uint16_t RELAY_DELAY = 500;
-const uint8_t alarmCount = 4;
 const uint8_t ampCount = 8;
-unsigned long debounceTime = millis();
-const uint8_t DEBOUNCE_DELAY = 200;
-const uint16_t rPins[relayCount] = {D0, D1, D2, D3};
-const uint8_t ALARM[alarmCount] = {C0, C1, C2, C3};
-
 double AMP_READING[ampCount];
-
-byte alarmState[alarmCount] = {0, 0, 0, 0};
 double signalStrength;
 
+Timer timer(2000, updateAmpVariables);
+AlarmDetector alarmDetector;
+RemoteAlarmReset remoteAlarmReset;
+
+CurrentMonitor monitor(3300, 1480);
+double cMonCalibration = 111.1;
+
 //function declarations
-void setAlarm(bool inAlarm, int alarmNum);
+void processAlarm(int alarmNum, bool alarmState);
 int alarmReset(String alarmNum);
 int setAlarmCount(String alarmCount);
 int setClampCount(String clampCount);
 int setCalibration(String num);
 void updateAmpVariable();
 
-Timer timer(2000, updateAmpVariables);
-
-CurrentMonitor monitor(3300, 1480);
-double cMonCalibration = 111.1;
-
 void setup() {
-
-  #if MONITOR_DEBUG
-    Serial.begin();
-  #endif
 
   // Get saved settings from EEPROM
   EEPROM.get(0, settings);
 
+  // Check if EEPROM data exists
   if(settings.version != 0){
     settings.version = 0;
-    settings.alarms = alarmCount;
-    settings.relays = relayCount;
+    settings.alarms = alarmDetector.getDefaultAlarmCount();
+    settings.relays = remoteAlarmReset.getDefaultRelayCount();
     settings.clamps = ampCount;
     settings.calibration = cMonCalibration;
 
@@ -88,112 +80,105 @@ void setup() {
   Particle.function("Relay_Count", setRelayCount);
   Particle.function("Change_Calibration", setCalibration);
 
-  // Timer for Amp Clamp ADC updates
-  timer.start();
-
-  for(int i = 0; i < alarmCount; i++){
-    pinMode(ALARM[i], INPUT);
-  }
-
-  for(int i = 0; i < relayCount; i++){
-    pinMode(rPins[i], OUTPUT);
-    digitalWrite(rPins[i], HIGH);
-  }
-
+  // Setup Particle Variables
   Particle.variable("Signal_Strength", &signalStrength, DOUBLE);
-
   for(int i = 0; i < settings.clamps; i++){
     Particle.variable(String("Amp_" + String(i)), &AMP_READING[i], DOUBLE);
   }
+
+  // Timer for Amp Clamp ADC updates
+  timer.start();
 
 }
 
 void loop() {
 
   for(int i = 0; i < settings.alarms; i++){
-    byte pinStatus = digitalRead(ALARM[i]);
-    pinStatus == HIGH ? setAlarm(true, i) : setAlarm(false, i);
-    
-    #if MONITOR_DEBUG
-    Serial.print(String(i) + " Value: " + String(pinStatus));
-    Serial.print(" ");
-    #endif
+    // critical
+    noInterrupts();
+    bool pinState = alarmDetector.getAlarmState(i);
+    interrupts();
+    // critical
+    processAlarm(i, pinState);
   }
-  #if MONITOR_DEBUG
-  Serial.println();
-  #endif
 
   CellularSignal sig = Cellular.RSSI();
   signalStrength = sig.getStrength();
 
 }
 
-int alarmReset(String alarmNum){
-  int alarm = alarmNum.toInt();
-  if(alarm < 1 || alarm > settings.relays){
-    return 0;
-  }
-
-  digitalWrite(rPins[alarm-1], LOW);
-  long resetDelay = millis();
-  while(millis() - resetDelay < RELAY_DELAY){
-    //wait (this is here instead to delay() so interrupts can occur)
-  }
-  digitalWrite(rPins[alarm-1], HIGH);
-
-  Particle.publish(PUBLISH_NAME, String("Remote Dryer Alarm " + alarmNum + " Reset Sent"), PRIVATE);
-
-  #if MONITOR_DEBUG
-  Serial.println("Remote Dryer Alarm " + alarmNum + " Reset Sent");
-  #endif
-  return 1;
-}
-
-void setAlarm(bool inAlarm, int alarmNum){
+/**
+ * This is executed each loop() to continually check the state
+ * of air dryer alarms. Any changes in alarm state get published
+ * as an event to Particle.io.
+ */
+void processAlarm(int alarmNum, bool alarmState){
   
-  if(inAlarm){
+  if(alarmState){
     String alarmStr = String("Dryer ") + String(alarmNum+1) + String(" in Alarm");
 
-    if(((millis() - debounceTime) > DEBOUNCE_DELAY) && alarmState[alarmNum] == 0){
-      Particle.publish(PUBLISH_NAME, alarmStr, PRIVATE);
-      debounceTime = millis();
-      #if MONITOR_DEBUG
-      Serial.println(alarmStr);
-      #endif
+    // Only publish the in alarm state if the previous state was not in alarm
+    if(!alarmDetector.getPreviousAlarmState(alarmNum)){
+      Particle.publish(PUBLISH_NAME_ALARM, alarmStr, PRIVATE);
     }
-    alarmState[alarmNum] = 1;
+    alarmDetector.setPreviousAlarmState(alarmNum, true);
     return;
   }
 
-  if(((millis() - debounceTime) > DEBOUNCE_DELAY) && alarmState[alarmNum] == 1){
+  // Only publish the alarm reset state if the preivous state was in alarm
+  if(alarmDetector.getPreviousAlarmState(alarmNum)){
     String resetStr = String("Dryer Alarm " + String(alarmNum+1) + " Reset");
-    Particle.publish(PUBLISH_NAME, resetStr, PRIVATE);
-    debounceTime = millis();
-    #if MONITOR_DEBUG
-    Serial.println(resetStr);
-    #endif
+    Particle.publish(PUBLISH_NAME_ALARM, resetStr, PRIVATE);
   }
-  alarmState[alarmNum] = 0;
+  alarmDetector.setPreviousAlarmState(alarmNum, false);
 }
 
+/**
+ * This is an exposed method to Particle.io to trigger the
+ * alarm Reset relay. Any time the remote reset is triggered
+ * the setAlarm 
+ */
+int alarmReset(String alarmNum){
+  int resetNum = alarmNum.toInt();
+  if(resetNum < 1 || resetNum > settings.relays){
+    return 0;
+  }
+
+  remoteAlarmReset.process(resetNum);
+
+  Particle.publish(PUBLISH_NAME_ALARM, String("Remote Dryer Alarm " + alarmNum + " Reset Sent"), PRIVATE);
+
+  return 1;
+}
+
+/**
+ * This is an exposed method to Particle.io to set the amount
+ * of installed Air Dryer Alarms. The settings is saved to 
+ * EEPROM.
+ * param count: Number of installed Alarms 1 - 4
+ */
 int setAlarmCount(String count){
   int aCount = count.toInt();
-  if(aCount < 1 || aCount > alarmCount){
+  if(aCount < 1 || aCount > alarmDetector.getDefaultAlarmCount()){
     return 0;
   }
 
   settings.alarms = aCount;
-
   EEPROM.put(0, settings);
 
-  Particle.publish(PUBLISH_NAME, String("Alarm Count has been updated to " + String(aCount)), PRIVATE);
+  Particle.publish(PUBLISH_NAME_MSG, String("Alarm Count has been updated to " + String(aCount)), PRIVATE);
 
   return 1;
 }
 
+/**
+ * This is an exposed method to Particle.io to set the amount
+ * of installed reset Relays. The setting is saved to EEPROM.
+ * param count: Number of installed Relays 0 - 4
+ */
 int setRelayCount(String count){
   int rCount = count.toInt();
-  if(rCount < 0 || rCount > relayCount){
+  if(rCount < 0 || rCount > remoteAlarmReset.getDefaultRelayCount()){
     return 0;
   }
 
@@ -201,11 +186,17 @@ int setRelayCount(String count){
 
   EEPROM.put(0, settings);
 
-  Particle.publish(PUBLISH_NAME, String("Relay Count has been updated to " + String(rCount)), PRIVATE);
+  Particle.publish(PUBLISH_NAME_MSG, String("Relay Count has been updated to " + String(rCount)), PRIVATE);
 
   return 1;
 }
 
+/**
+ * This is an exposed method to Particle.io to set the amount
+ * of AMP clamps that are installed on the monitor. The setting
+ * is saved to EEPROM.
+ * param count: Number of AMP clamps 1 - 8
+ */
 int setClampCount(String count){
   int cCount = count.toInt();
   if(cCount < 1 || cCount > ampCount){
@@ -213,14 +204,18 @@ int setClampCount(String count){
   }
 
   settings.clamps = cCount;
-
   EEPROM.put(0, settings);
 
-  Particle.publish(PUBLISH_NAME, String("Amp Clamp Count has been updated to " + String(cCount)), PRIVATE);
+  Particle.publish(PUBLISH_NAME_MSG, String("Amp Clamp Count has been updated to " + String(cCount)), PRIVATE);
 
   return 1;
 }
 
+/**
+ * This is an exposed method to Particle.io to set the calibration
+ * for the AMP clamps. The setting is saved to EEPROM.
+ * param num: Calibration value
+ */
 int setCalibration(String num)
 {
   double calibration = num.toFloat();
@@ -229,26 +224,25 @@ int setCalibration(String num)
   }
   
   settings.calibration = calibration;
-
   EEPROM.put(0, settings);
 
-  Particle.publish(PUBLISH_NAME, String("Calibration has been updated to " + String(calibration)), PRIVATE);
+  Particle.publish(PUBLISH_NAME_MSG, String("Calibration has been updated to " + String(calibration)), PRIVATE);
 
   return 1;
 }
 
+/**
+ * This method retrieves the Amperage reading on each enabled
+ * AMP terminal.
+ * The globally declared timer is set to trigger this function
+ * at a set interval. Depending on the settings, the AMP clamp
+ * readings get updated.
+ */
 void updateAmpVariables(){
   for(int i = 0; i < settings.clamps; i++){
     double iRMS = monitor.getIrms(i, settings.calibration);
     AMP_READING[i] = iRMS;
   }
 
-  #if MONITOR_DEBUG
-  for(int i = 0; i < settings.clamps; i++){
-    Serial.print(String("Amp_") + String(i) + String(" "));
-    Serial.print(AMP_READING[i]);
-    Serial.print(" ");
-  }
-  Serial.println();
-  #endif
+  // add publish event here
 }

@@ -28,6 +28,7 @@ public:
 
   double getPower(const uint8_t channel);
   double getIrms(const uint8_t channel, const double calibration);
+  
 
 private:
 
