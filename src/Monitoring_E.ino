@@ -2,7 +2,7 @@
 // Product Name: Nhinja 2020 (Proto)
 PRODUCT_ID(10352);
 
-PRODUCT_VERSION(12);
+PRODUCT_VERSION(13);
 
 /*
  * Project Nhinja Monitoring
@@ -12,9 +12,12 @@ PRODUCT_VERSION(12);
  */
 
 #include "CurrentMonitor.h"
+#include "AlarmDetector.h"
 
-#define MONITOR_DEBUG false
-#define PUBLISH_NAME "Dryer_Alarms" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDS ON THIS
+#define MONITOR_DEBUG true
+#define PUBLISH_NAME_ALARM "Dryer_Alarms" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
+#define PUBLISH_NAME_AMP "Amp_Values" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
+#define PUBLISH_NAME_MSG "Messages" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
 
 struct MonitorSettings{
   uint8_t version;
@@ -23,13 +26,10 @@ struct MonitorSettings{
 } settings;
 
 const uint8_t relayCount = 4;
-const uint16_t RELAY_DELAY = 500;
-const uint8_t alarmCount = 4;
+const uint16_t RELAY_DELAY = 200;
 const uint8_t ampCount = 8;
-unsigned long debounceTime = millis();
-const uint8_t DEBOUNCE_DELAY = 200;
 const uint16_t rPins[relayCount] = {D0, D1, D2, D3};
-const uint8_t ALARM[alarmCount] = {C0, C1, C2, C3};
+const uint8_t ALARM[alarmCount] = {C0, C3, C4, C5};
 
 double AMP_READING[ampCount];
 
@@ -45,6 +45,7 @@ int setCalibration(String num);
 void updateAmpVariable();
 
 Timer timer(2000, updateAmpVariables);
+AlarmDetector alarm;
 
 CurrentMonitor monitor(3300, 1480);
 double cMonCalibration = 111.1;
@@ -60,7 +61,7 @@ void setup() {
 
   if(settings.version != 0){
     settings.version = 0;
-    settings.alarms = alarmCount;
+    settings.alarms = alarm.getDefaultAlarmCount();
     settings.relays = relayCount;
     settings.clamps = ampCount;
     settings.calibration = cMonCalibration;
@@ -128,7 +129,7 @@ int alarmReset(String alarmNum){
   }
   digitalWrite(rPins[alarm-1], HIGH);
 
-  Particle.publish(PUBLISH_NAME, String("Remote Dryer Alarm " + alarmNum + " Reset Sent"), PRIVATE);
+  Particle.publish(PUBLISH_NAME_ALARM, String("Remote Dryer Alarm " + alarmNum + " Reset Sent"), PRIVATE);
 
   #if MONITOR_DEBUG
   Serial.println("Remote Dryer Alarm " + alarmNum + " Reset Sent");
@@ -142,7 +143,7 @@ void setAlarm(bool inAlarm, int alarmNum){
     String alarmStr = String("Dryer ") + String(alarmNum+1) + String(" in Alarm");
 
     if(((millis() - debounceTime) > DEBOUNCE_DELAY) && alarmState[alarmNum] == 0){
-      Particle.publish(PUBLISH_NAME, alarmStr, PRIVATE);
+      Particle.publish(PUBLISH_NAME_ALARM, alarmStr, PRIVATE);
       debounceTime = millis();
       #if MONITOR_DEBUG
       Serial.println(alarmStr);
@@ -154,7 +155,7 @@ void setAlarm(bool inAlarm, int alarmNum){
 
   if(((millis() - debounceTime) > DEBOUNCE_DELAY) && alarmState[alarmNum] == 1){
     String resetStr = String("Dryer Alarm " + String(alarmNum+1) + " Reset");
-    Particle.publish(PUBLISH_NAME, resetStr, PRIVATE);
+    Particle.publish(PUBLISH_NAME_ALARM, resetStr, PRIVATE);
     debounceTime = millis();
     #if MONITOR_DEBUG
     Serial.println(resetStr);
@@ -173,7 +174,7 @@ int setAlarmCount(String count){
 
   EEPROM.put(0, settings);
 
-  Particle.publish(PUBLISH_NAME, String("Alarm Count has been updated to " + String(aCount)), PRIVATE);
+  Particle.publish(PUBLISH_NAME_MSG, String("Alarm Count has been updated to " + String(aCount)), PRIVATE);
 
   return 1;
 }
@@ -188,7 +189,7 @@ int setRelayCount(String count){
 
   EEPROM.put(0, settings);
 
-  Particle.publish(PUBLISH_NAME, String("Relay Count has been updated to " + String(rCount)), PRIVATE);
+  Particle.publish(PUBLISH_NAME_MSG, String("Relay Count has been updated to " + String(rCount)), PRIVATE);
 
   return 1;
 }
@@ -203,7 +204,7 @@ int setClampCount(String count){
 
   EEPROM.put(0, settings);
 
-  Particle.publish(PUBLISH_NAME, String("Amp Clamp Count has been updated to " + String(cCount)), PRIVATE);
+  Particle.publish(PUBLISH_NAME_MSG, String("Amp Clamp Count has been updated to " + String(cCount)), PRIVATE);
 
   return 1;
 }
@@ -219,7 +220,7 @@ int setCalibration(String num)
 
   EEPROM.put(0, settings);
 
-  Particle.publish(PUBLISH_NAME, String("Calibration has been updated to " + String(calibration)), PRIVATE);
+  Particle.publish(PUBLISH_NAME_MSG, String("Calibration has been updated to " + String(calibration)), PRIVATE);
 
   return 1;
 }
