@@ -10,17 +10,17 @@ RemoteAlarmReset::RemoteAlarmReset()
 {
     for(int i = 0; i < relayCount; i++){
         pinMode(hardwareRelayPin[i], OUTPUT);
-        digitalWrite(hardwareRelayPin[i], HIGH);
+        digitalWrite(hardwareRelayPin[i], LOW);
     }
 }
 
 void RemoteAlarmReset::process(const uint8_t resetNum){
-    digitalWrite(hardwareRelayPin[resetNum-1], LOW);
+    digitalWrite(hardwareRelayPin[resetNum-1], HIGH);
     long resetDelay = millis();
 
     while(millis() - resetDelay < RELAY_DELAY); //wait (this is here instead to delay() so interrupts can occur)
   
-    digitalWrite(hardwareRelayPin[resetNum-1], HIGH);
+    digitalWrite(hardwareRelayPin[resetNum-1], LOW);
 }
 
 const uint8_t RemoteAlarmReset::getDefaultRelayCount(){
