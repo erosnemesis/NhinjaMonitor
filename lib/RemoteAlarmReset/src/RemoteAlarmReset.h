@@ -5,6 +5,7 @@
 
 // This will load the definition for common Particle variable types
 #include "Particle.h"
+#include "AlarmDetector.h"
 
 // This is your main class that users will import into their application
 class RemoteAlarmReset
@@ -15,7 +16,7 @@ public:
    */
   RemoteAlarmReset();
 
-  void process(uint8_t resetNum);
+  void process(const uint8_t resetNum);
   const uint8_t getDefaultRelayCount();
 
 private:

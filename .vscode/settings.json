@@ -22,9 +22,11 @@
         "functional": "cpp",
         "iosfwd": "cpp",
         "streambuf": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "random": "cpp",
+        "memory": "cpp"
     },
     "particle.targetPlatform": "electron",
-    "particle.targetDevice": "2e0042000a47373336373936",
+    "particle.targetDevice": "220039000147373336373936",
     "particle.firmwareVersion": "1.4.4"
 }

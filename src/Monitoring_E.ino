@@ -2,7 +2,7 @@
 // Product Name: Nhinja 2020 (Proto)
 PRODUCT_ID(10352);
 
-PRODUCT_VERSION(17);
+PRODUCT_VERSION(18);
 
 /*
  * Project Nhinja Monitoring
@@ -15,8 +15,15 @@ PRODUCT_VERSION(17);
 #include "AlarmDetector.h"
 #include "RemoteAlarmReset.h"
 
-#define PUBLISH_NAME_ALARM "Dryer_Alarms" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
 #define PUBLISH_NAME_MSG "Messages" // DO NOT MODIFY THIS. GOOGLE CLOUD PUBSUB DEPENDANCY
+
+//function declarations
+int alarmReset(String alarmNum);
+int setAlarmCount(String alarmCount);
+int setRelayCount(String count);
+int setClampCount(String clampCount);
+int setCalibration(String num);
+void updateAmpVariables();
 
 struct MonitorSettings{
   uint8_t version;
@@ -29,21 +36,16 @@ double AMP_READING[ampCount];
 double signalStrength;
 
 Timer timer(2000, updateAmpVariables);
+//Timer resetTimer(10000, resetDevice);
 AlarmDetector alarmDetector;
 RemoteAlarmReset remoteAlarmReset;
 
 CurrentMonitor monitor(3300, 1480);
-double cMonCalibration = 111.1;
-
-//function declarations
-void processAlarm(int alarmNum, bool alarmState);
-int alarmReset(String alarmNum);
-int setAlarmCount(String alarmCount);
-int setClampCount(String clampCount);
-int setCalibration(String num);
-void updateAmpVariable();
+double cMonCalibration = 45;
 
 void setup() {
+
+  Serial.begin(9600);
 
   // Get saved settings from EEPROM
   EEPROM.get(0, settings);
@@ -72,9 +74,14 @@ void setup() {
     Particle.variable(String("Amp_" + String(i)), &AMP_READING[i], DOUBLE);
   }
   Particle.variable("Amp_Calibration", &settings.calibration, DOUBLE);
+  alarmDetector.setParticleVariables(settings.alarms);
 
   // Timer for Amp Clamp ADC updates
   timer.start();
+
+  // check current alarm state on bootup.
+  // never place this within LOOP().
+  alarmDetector.checkStateOnBoot();
 
 }
 
@@ -85,38 +92,13 @@ void loop() {
     noInterrupts();
     bool pinState = alarmDetector.getAlarmState(i);
     interrupts();
-    // critical
-    processAlarm(i, pinState);
+    
+    alarmDetector.processAlarm(i, pinState);
   }
 
   CellularSignal sig = Cellular.RSSI();
   signalStrength = sig.getStrength();
 
-}
-
-/**
- * This is executed each loop() to continually check the state
- * of air dryer alarms. Any changes in alarm state get published
- * as an event to Particle.io.
- */
-void processAlarm(int alarmNum, bool alarmState){
-  
-  if(alarmState){
-    // Only publish the in alarm state if the previous state was not in alarm
-    if(!alarmDetector.getPreviousAlarmState(alarmNum)){
-      String alarmStr = String("Dryer ") + String(alarmNum+1) + String(" in Alarm");
-      Particle.publish(PUBLISH_NAME_ALARM, alarmStr, PRIVATE);
-    }
-    alarmDetector.setPreviousAlarmState(alarmNum, true);
-    return;
-  }
-
-  // Only publish the alarm reset state if the preivous state was in alarm
-  if(alarmDetector.getPreviousAlarmState(alarmNum)){
-    String resetStr = String("Dryer Alarm " + String(alarmNum+1) + " Reset");
-    Particle.publish(PUBLISH_NAME_ALARM, resetStr, PRIVATE);
-  }
-  alarmDetector.setPreviousAlarmState(alarmNum, false);
 }
 
 /**
@@ -131,8 +113,6 @@ int alarmReset(String alarmNum){
   }
 
   remoteAlarmReset.process(resetNum);
-
-  Particle.publish(PUBLISH_NAME_ALARM, String("Remote Dryer Alarm " + alarmNum + " Reset Sent"), PRIVATE);
 
   return 1;
 }
