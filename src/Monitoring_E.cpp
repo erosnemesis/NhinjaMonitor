@@ -13,7 +13,7 @@ int setClampCount(String count);
 #line 3 "c:/Users/erosn/ownCloud/ParticleProjects/Monitoring_E/src/Monitoring_E.ino"
 PRODUCT_ID(10352);
 
-PRODUCT_VERSION(18);
+PRODUCT_VERSION(19);
 
 /*
  * Project Nhinja Monitoring
@@ -35,16 +35,19 @@ int setRelayCount(String count);
 int setClampCount(String clampCount);
 int setCalibration(String num);
 void updateAmpVariables();
+void setDeviceName(const char *topic, const char *data);
 
 struct MonitorSettings{
   uint8_t version;
   uint8_t alarms, relays, clamps;
   double calibration;
+  char deviceName[20];
 } settings;
 
 const uint8_t ampCount = 8;
 double AMP_READING[ampCount];
 double signalStrength;
+char defaultDeviceName[20] = "";
 
 Timer timer(2000, updateAmpVariables);
 AlarmDetector alarmDetector;
@@ -55,21 +58,27 @@ double cMonCalibration = 45;
 
 void setup() {
 
-  Serial.begin(9600);
-
   // Get saved settings from EEPROM
   EEPROM.get(0, settings);
 
   // Check if EEPROM data exists
   if(settings.version != 0){
-    settings.version = 0;
-    settings.alarms = alarmDetector.getDefaultAlarmCount();
-    settings.relays = remoteAlarmReset.getDefaultRelayCount();
-    settings.clamps = ampCount;
-    settings.calibration = cMonCalibration;
+    MonitorSettings s = {
+      0,
+      alarmDetector.getDefaultAlarmCount(),
+      remoteAlarmReset.getDefaultRelayCount(),
+      ampCount,
+      cMonCalibration,
+      *defaultDeviceName
+    };
+    settings = s;
 
     EEPROM.put(0, settings);
   }
+
+  // Setup Particle Subscriptions
+  Particle.subscribe("particle/device/name", setDeviceName, MY_DEVICES);
+  Particle.publish("particle/device/name", PRIVATE);
 
   // Setup Particle Functions
   Particle.function("Reset_Dryer", alarmReset);
@@ -103,7 +112,7 @@ void loop() {
     bool pinState = alarmDetector.getAlarmState(i);
     interrupts();
     
-    alarmDetector.processAlarm(i, pinState);
+    alarmDetector.processAlarm(i, pinState, String(settings.deviceName));
   }
 
   CellularSignal sig = Cellular.RSSI();
@@ -112,17 +121,28 @@ void loop() {
 }
 
 /**
+ * This this a Particle subscription handler method to set
+ * the device name which is going to be the devices 
+ * Location and Number. Example: Seattle
+ */
+void setDeviceName(const char *topic, const char *data){
+  strcpy(settings.deviceName, String(data).c_str());
+
+  EEPROM.put(0, settings);
+}
+
+/**
  * This is an exposed method to Particle.io to trigger the
  * alarm Reset relay. Any time the remote reset is triggered
  * the setAlarm 
  */
 int alarmReset(String alarmNum){
-  int resetNum = alarmNum.toInt();
+  uint8_t resetNum = alarmNum.toInt();
   if(resetNum < 1 || resetNum > settings.relays){
     return 0;
   }
 
-  remoteAlarmReset.process(resetNum);
+  remoteAlarmReset.process(resetNum, String(settings.deviceName));
 
   return 1;
 }

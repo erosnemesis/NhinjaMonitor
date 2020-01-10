@@ -20,13 +20,13 @@ AlarmDetector::AlarmDetector()
   attachInterrupt(digitalPinToInterrupt(hardwareAlarmPin[3]), &AlarmDetector::alarm3, this, CHANGE);
 }
 
-void AlarmDetector::setParticleVariables(const uint8_t alarmCount){
+void AlarmDetector::setParticleVariables(const uint8_t &alarmCount){
     for(int i = 0; i < alarmCount; i++){
         Particle.variable(String("Alarm_" + String(i+1)), &previousAlarmState[i], INT);
     }
 }
 
-const uint8_t AlarmDetector::getAlarmState(uint8_t alarm){
+const uint8_t AlarmDetector::getAlarmState(const uint8_t &alarm){
     return alarmState[alarm];
 }
 
@@ -63,11 +63,11 @@ const uint8_t AlarmDetector::getDefaultAlarmCount()
     return alarmCount;
 }
 
-const uint8_t AlarmDetector::getPreviousAlarmState(uint8_t alarm){
+const uint8_t AlarmDetector::getPreviousAlarmState(const uint8_t &alarm){
     return previousAlarmState[alarm];
 }
 
-void AlarmDetector::setPreviousAlarmState(uint8_t alarm, bool state){
+void AlarmDetector::setPreviousAlarmState(const uint8_t &alarm, const bool &state){
     previousAlarmState[alarm] = state;
 }
 
@@ -76,12 +76,12 @@ void AlarmDetector::setPreviousAlarmState(uint8_t alarm, bool state){
  * of air dryer alarms. Any changes in alarm state get published
  * as an event to Particle.io.
  */
-void AlarmDetector::processAlarm(int alarmNum, bool state){
+void AlarmDetector::processAlarm(const uint8_t &alarmNum, const bool &state, const String &deviceName){
   
   if(state){
     // Only publish the in alarm state if the previous state was not in alarm
     if(!getPreviousAlarmState(alarmNum)){
-      String alarmStr = String("Dryer ") + String(alarmNum+1) + String(" in Alarm");
+      String alarmStr = deviceName + String(" ") + String(alarmNum+1) + String(" in Alarm");
       digitalWrite(hardwareLEDPin[alarmNum], HIGH);
       Particle.publish(PUBLISH_NAME_ALARM, alarmStr, PRIVATE);
     }
@@ -91,7 +91,7 @@ void AlarmDetector::processAlarm(int alarmNum, bool state){
 
   // Only publish the alarm reset state if the preivous state was in alarm
   if(getPreviousAlarmState(alarmNum)){
-    String resetStr = String("Dryer Alarm " + String(alarmNum+1) + " Reset");
+    String resetStr = deviceName + String(" Alarm " + String(alarmNum+1) + " Reset");
     digitalWrite(hardwareLEDPin[alarmNum], LOW);
     Particle.publish(PUBLISH_NAME_ALARM, resetStr, PRIVATE);
   }

@@ -14,9 +14,9 @@ RemoteAlarmReset::RemoteAlarmReset()
     }
 }
 
-void RemoteAlarmReset::process(const uint8_t resetNum){
+void RemoteAlarmReset::process(const uint8_t &resetNum, const String &deviceName){
 
-    Particle.publish(PUBLISH_NAME_ALARM, String("Remote Dryer Alarm " + String(resetNum) + " Reset Sent"), PRIVATE);
+    Particle.publish(PUBLISH_NAME_ALARM, String("Remote " + deviceName + " Alarm " + String(resetNum) + " Reset Sent"), PRIVATE);
 
     digitalWrite(hardwareRelayPin[resetNum-1], HIGH);
     long resetDelay = millis();

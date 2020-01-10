@@ -16,7 +16,7 @@ public:
    */
   RemoteAlarmReset();
 
-  void process(const uint8_t resetNum);
+  void process(const uint8_t &resetNum, const String &deviceName);
   const uint8_t getDefaultRelayCount();
 
 private:

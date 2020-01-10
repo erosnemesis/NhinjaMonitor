@@ -18,20 +18,20 @@ public:
    */
   AlarmDetector();
 
-  void setParticleVariables(const uint8_t alarmCount);
+  void setParticleVariables(const uint8_t &alarmCount);
   void alarm0();
   void alarm1();
   void alarm2();
   void alarm3(); 
   const uint8_t getDefaultAlarmCount();
-  const byte getAlarmState(uint8_t alarm);
-  void processAlarm(int alarmNum, bool state);
+  const byte getAlarmState(const uint8_t &alarm);
+  void processAlarm(const uint8_t &alarmNum, const bool &state, const String &deviceName);
   void checkStateOnBoot();
 
 private:
 
-  const byte getPreviousAlarmState(uint8_t alarm);
-  void setPreviousAlarmState(uint8_t alarm, bool state);
+  const byte getPreviousAlarmState(const uint8_t &alarm);
+  void setPreviousAlarmState(const uint8_t &alarm, const bool &state);
 
   static const uint8_t alarmCount = 4;
   int previousAlarmState[alarmCount] = {0, 0, 0, 0};
