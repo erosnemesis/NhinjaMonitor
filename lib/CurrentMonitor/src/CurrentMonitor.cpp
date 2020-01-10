@@ -40,7 +40,7 @@ double CurrentMonitor::getPower(const uint8_t channel)
     return -1;
   }
   calculate(channel);
-  return iRMS * vRMS;
+  return iRMS[channel] * vRMS;
 }
 
 double CurrentMonitor::getIrms(const uint8_t channel, const double calibration)
@@ -50,7 +50,7 @@ double CurrentMonitor::getIrms(const uint8_t channel, const double calibration)
   }
   Ical = calibration;
   calculateIrms(channel);
-  return iRMS;
+  return iRMS[channel];
 }
 
 /**
@@ -78,7 +78,7 @@ void CurrentMonitor::calculate(const uint8_t channel)
   }
 
   // Calculate RMS from accumulated values
-  iRMS = sqrt(accumulator / numSamples);
+  iRMS[channel] = sqrt(accumulator / numSamples);
 
   return;
 }
@@ -106,7 +106,7 @@ void CurrentMonitor::calculateIrms(const uint8_t channel)
   }
 
   double I_RATIO = Ical *((vcc/1000.0) / (ADC_COUNTS));
-  iRMS = I_RATIO * sqrt(sum / numSamples);
+  iRMS[channel] = I_RATIO * sqrt(sum / numSamples);
 
   return;
 }

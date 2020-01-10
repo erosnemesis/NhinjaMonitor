@@ -44,7 +44,7 @@ private:
 
   // Sample reading storage location
   int sample;
-  double iRMS;
+  double iRMS[maxClampCount];
   double Ical;
   double filtered;
   
