@@ -36,7 +36,6 @@ double AMP_READING[ampCount];
 double signalStrength;
 
 Timer timer(2000, updateAmpVariables);
-//Timer resetTimer(10000, resetDevice);
 AlarmDetector alarmDetector;
 RemoteAlarmReset remoteAlarmReset;
 
